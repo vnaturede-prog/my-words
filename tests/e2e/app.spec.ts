@@ -370,6 +370,22 @@ test("PWA manifest、图标、Service Worker 与离线冷启动后新增编辑",
   await expect(
     cold.getByRole("button", { name: "查看 ceramic" }),
   ).toBeVisible();
+  // Regression: the screenshot's plural was previously missing from the
+  // bundled dictionary. It must work using the real precache, without an API.
+  await cold.getByRole("navigation")
+    .getByRole("button", { name: "添加单词", exact: true }).click();
+  await cold.getByRole("dialog").getByLabel("英文单词", { exact: false }).fill("reels");
+  await expect(cold.getByLabel("中文释义", { exact: false })).toHaveValue(/卷轴/);
+  await expect(cold.getByText("离线查询完成；联网后可补充英美发音和例句。")).toBeVisible();
+  await expect(cold.locator(".dictionary-preview")).toContainText("ri:lz");
+  await expect(cold.locator(".dictionary-preview")).toContainText("a roll of photographic film");
+  await cold.getByLabel("中文释义", { exact: false }).fill("我修改的 reels 中文解释");
+  await cold.getByLabel("我的中文备注").fill("复数与第三人称单数：离线保存");
+  await cold.getByRole("button", { name: "保存单词", exact: true }).click();
+  await cold.reload();
+  await cold.getByRole("button", { name: "查看 reels" }).click();
+  await expect(cold.getByRole("dialog").getByText("我修改的 reels 中文解释", { exact: true })).toBeVisible();
+  await expect(cold.getByRole("dialog").getByText("复数与第三人称单数：离线保存", { exact: true })).toBeVisible();
 });
 
 test.describe("网络故障交互测试", () => {
@@ -383,20 +399,21 @@ test.describe("网络故障交互测试", () => {
     await page
       .getByRole("dialog")
       .getByLabel("英文单词", { exact: false })
-      .fill("ceramic");
+      .fill("reels");
     await expect(
       page.getByText(
         "在线词典暂不可用，已显示 ECDICT 本地内容；可稍后重新查词补充音频和例句。",
       ),
     ).toBeVisible();
-    await page.getByLabel("中文释义", { exact: false }).fill("陶瓷");
+    await expect(page.getByLabel("中文释义", { exact: false })).toHaveValue(/卷轴/);
+    await page.getByLabel("中文释义", { exact: false }).fill("卷轴（自己的解释）");
     await page
       .getByLabel("单词分类", { exact: true })
       .selectOption("陶瓷专业英语");
     await page.getByRole("button", { name: "保存单词", exact: true }).click();
     await expect(
-      page.getByRole("button", { name: "查看 ceramic" }),
+      page.getByRole("button", { name: "查看 reels" }),
     ).toBeVisible();
-    await expect(page.getByText("陶瓷", { exact: true })).toBeVisible();
+    await expect(page.getByText("卷轴（自己的解释）", { exact: true })).toBeVisible();
   });
 });
