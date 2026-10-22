@@ -4,7 +4,7 @@
   "commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
   "sourceSha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
   "license": "MIT",
-  "entries": 58446,
-  "selection": "BNC or COCA frequency rank <= 50000, or study tags, or ceramic terminology; ASCII English words and phrases only",
+  "entries": 91144,
+  "selection": "BNC or COCA frequency rank <= 50000, or study tags, or ceramic terminology, plus exact source entries for their exchange-linked inflections; ASCII English words and phrases only",
   "phonetics": "General source transcription only; no US/UK accent is inferred"
 }

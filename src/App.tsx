@@ -448,7 +448,7 @@ function Editor({
       else if (englishResult.status === "rejected")
         setQueryNote(
           englishResult.reason instanceof TypeError
-            ? "网络不可用，可以手动填写并保存。"
+            ? "在线词典连接失败，本地词典也暂无可用结果；可以手动填写并保存。"
             : message(englishResult.reason),
         );
       else setQueryNote("当前离线，可以手动填写并保存，联网后再查询词典。");

@@ -55,7 +55,7 @@ describe("自动中文释义与本地词典", () => {
     const metadata = JSON.parse(
       readFileSync("public/dictionary/metadata.json", "utf8"),
     );
-    expect(metadata.entries).toBe(58446);
+    expect(metadata.entries).toBe(91144);
     expect(metadata.license).toBe("MIT");
     for (const [word, expected] of [
       ["apple", "苹果"],
@@ -80,5 +80,28 @@ describe("自动中文释义与本地词典", () => {
     expect(readFileSync("public/dictionary/LICENSE.txt", "utf8")).toContain(
       "Permission is hereby granted",
     );
+  });
+  it("复数和动词变化形式使用实际词条及其音标，保留独立词义", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const letter = /\/([a-z])\.json$/.exec(url)?.[1];
+      return new Response(readFileSync(`public/dictionary/${letter}.json`, "utf8"));
+    }));
+    const { lookupLocalWord } = await import("../src/local-dictionary");
+    const reels = await lookupLocalWord("  REELS ");
+    expect(reels?.chinese).toContain("卷轴");
+    expect(reels?.chinese).toContain("第三人称单数");
+    expect(reels?.dictionary.phonetic).toBe("ri:lz");
+    expect(reels?.dictionary.meanings[0]).toEqual({
+      partOfSpeech: "noun",
+      definition: "a roll of photographic film holding a series of frames to be projected by a movie projector",
+      example: "",
+    });
+    expect(reels?.dictionary.meanings.some(m => m.partOfSpeech === "verb")).toBe(true);
+    expect(reels?.dictionary.pronunciations).toEqual([]);
+    for (const word of ["walks", "walked", "went", "better"])
+      expect((await lookupLocalWord(word))?.chinese).toBeTruthy();
+    expect((await lookupLocalWord("news"))?.chinese).toContain("新闻");
+    expect((await lookupLocalWord("running"))?.chinese).toContain("跑");
+    expect(await lookupLocalWord("reelzzzz")).toBeNull();
   });
 });

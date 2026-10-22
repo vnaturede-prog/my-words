@@ -19,6 +19,8 @@ const parts: Record<string, string> = {
   adj: "adjective",
   ad: "adverb",
   adv: "adverb",
+  r: "adverb",
+  s: "adjective",
   pron: "pronoun",
   prep: "preposition",
   conj: "conjunction",
@@ -58,7 +60,7 @@ export async function lookupLocalWord(
     .split("\n")
     .filter(Boolean)
     .map((line) => {
-      const match = /^([a-z]+)\.\s*(.*)$/.exec(line);
+      const match = /^(n|v|vt|vi|a|adj|ad|adv|r|s|pron|prep|conj|interj)(?:\.\s*|\s+)(.*)$/.exec(line);
       return {
         partOfSpeech: match ? parts[match[1]] || match[1] : "",
         definition: match ? match[2] : line,
