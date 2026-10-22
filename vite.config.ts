@@ -12,7 +12,11 @@ export default defineConfig({
     VitePWA({
       scope: base,
       registerType: "prompt",
-      includeAssets: ["icon.svg", "apple-touch-icon.png"],
+      includeAssets: [
+        "icon.svg",
+        "apple-touch-icon.png",
+        "dictionary/LICENSE.txt",
+      ],
       manifest: {
         id: base,
         name: "My Words 我的随身单词本",
@@ -46,7 +50,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,png,svg,webmanifest}"],
+        globPatterns: ["**/*.{js,css,html,png,svg,webmanifest,json}"],
         navigateFallback: `${base}index.html`,
         cleanupOutdatedCaches: true,
         // Dictionary and remote audio intentionally remain network requests.

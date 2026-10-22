@@ -42,6 +42,7 @@ import {
 } from "./db";
 import { download, parseBackup, toCSV } from "./backup";
 import { lookupWord } from "./dictionary";
+import { lookupLocalWord } from "./local-dictionary";
 import {
   emptyDictionary,
   makeWord,
@@ -151,51 +152,131 @@ function Sheet({
   );
 }
 
-function AudioButtons({ data }: { data: DictionaryData }) {
+function AudioButtons({ data, word }: { data: DictionaryData; word: string }) {
   const [error, setError] = useState("");
   const current = useRef<HTMLAudioElement | null>(null);
+  const speaking = useRef<SpeechSynthesisUtterance | null>(null);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+    const update = () => setVoices(window.speechSynthesis.getVoices());
+    update();
+    window.speechSynthesis.addEventListener("voiceschanged", update);
+    return () =>
+      window.speechSynthesis.removeEventListener("voiceschanged", update);
+  }, []);
   useEffect(
     () => () => {
       current.current?.pause();
+      if (speaking.current) window.speechSynthesis?.cancel();
     },
     [],
   );
-  const choices = data.pronunciations
-    .filter((p) => p.audio)
-    .filter((p, i, arr) => arr.findIndex((x) => x.audio === p.audio) === i);
-  if (!choices.length) return <p className="muted small">词典暂未提供音频</p>;
+  async function play(audioUrl: string) {
+    setError("");
+    current.current?.pause();
+    if (speaking.current) window.speechSynthesis?.cancel();
+    const audio = new Audio(audioUrl);
+    current.current = audio;
+    audio.onerror = () =>
+      setError("词典音频暂时无法播放，请检查网络，或使用设备朗读。");
+    try {
+      await audio.play();
+    } catch {
+      setError("词典音频暂时无法播放，请检查网络，或使用设备朗读。");
+    }
+  }
+  function speak(voice: SpeechSynthesisVoice) {
+    setError("");
+    current.current?.pause();
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(word);
+    utterance.voice = voice;
+    utterance.lang = voice.lang;
+    speaking.current = utterance;
+    utterance.onerror = (event) => {
+      if (!["canceled", "interrupted"].includes(event.error))
+        setError("设备朗读失败，请检查系统语音设置。");
+    };
+    utterance.onend = () => {
+      speaking.current = null;
+    };
+    window.speechSynthesis.speak(utterance);
+  }
+  const generic = data.pronunciations.filter(
+    (p) => p.accent === "其他" && p.audio,
+  );
   return (
-    <div>
-      <div className="audio-row">
-        {choices.map((p, i) => (
-          <button
-            type="button"
-            className="audio-button"
-            key={p.audio}
-            onClick={async () => {
-              setError("");
-              current.current?.pause();
-              const audio = new Audio(p.audio);
-              current.current = audio;
-              audio.onerror = () =>
-                setError("音频暂时无法播放，请检查网络后重试。");
-              try {
-                await audio.play();
-              } catch {
-                setError("音频暂时无法播放，请检查网络后重试。");
-              }
-            }}
-          >
-            <Volume2 size={16} />
-            {p.accent === "US"
-              ? "美式"
-              : p.accent === "UK"
-                ? "英式"
-                : `发音${choices.length > 1 ? ` ${i + 1}` : ""}`}
-            {p.text && <span className="phonetic">{p.text}</span>}
-          </button>
-        ))}
-      </div>
+    <div className="pronunciations" aria-label="英美音标与发音">
+      {(["US", "UK"] as const).map((accent) => {
+        const label = accent === "US" ? "美式" : "英式";
+        const entries = data.pronunciations.filter((p) => p.accent === accent);
+        const text = [
+          ...new Set(entries.map((p) => p.text).filter(Boolean)),
+        ].join(" · ");
+        const audio = entries.find((p) => p.audio)?.audio;
+        const voice = voices.find(
+          (v) =>
+            v.lang.toLowerCase().replace("_", "-") ===
+            (accent === "US" ? "en-us" : "en-gb"),
+        );
+        return (
+          <div className="pronunciation-row" key={accent}>
+            <div>
+              <span className="small">{label}音标</span>
+              <p className="phonetic">{text || "词典未提供"}</p>
+            </div>
+            <div className="audio-row">
+              {audio && (
+                <button
+                  type="button"
+                  className="audio-button"
+                  aria-label={`${label}词典发音`}
+                  onClick={() => void play(audio)}
+                >
+                  <Volume2 size={16} />
+                  {label}发音
+                </button>
+              )}
+              {voice && (
+                <button
+                  type="button"
+                  className="audio-button"
+                  onClick={() => speak(voice)}
+                >
+                  <Volume2 size={16} />
+                  {label}设备朗读
+                </button>
+              )}
+              {!audio && !voice && (
+                <span className="muted small">暂无可用发音</span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+      {!data.pronunciations.some((p) => p.accent !== "其他" && p.text) &&
+        data.phonetic && (
+          <p className="small muted">
+            通用音标（词典未区分英美）：
+            <span className="phonetic">{data.phonetic}</span>
+          </p>
+        )}
+      {generic.length > 0 && (
+        <div className="audio-row">
+          {generic.map((p, i) => (
+            <button
+              type="button"
+              className="audio-button"
+              key={p.audio}
+              onClick={() => void play(p.audio)}
+            >
+              <Volume2 size={16} />
+              词典发音（未标注口音）{generic.length > 1 ? ` ${i + 1}` : ""}
+            </button>
+          ))}
+        </div>
+      )}
       {error && (
         <p role="status" className="error-text">
           {error}
@@ -223,9 +304,15 @@ function Definitions({ data }: { data: DictionaryData }) {
       ) : (
         <p className="muted">暂无词典释义，可以填写自己的中文解释和备注。</p>
       )}
+      {data.meanings.length > 0 && !data.meanings.some((m) => m.example) && (
+        <p className="small muted">词典暂未提供例句。</p>
+      )}
       {(data.sourceUrl || data.license) && (
         <p className="source">
-          词典：Free Dictionary API
+          词典：
+          {data.dictionarySource === "ecdict"
+            ? "ECDICT 本地词典"
+            : "Free Dictionary API"}
           {data.sourceUrl && (
             <>
               {" "}
@@ -269,6 +356,19 @@ function Editor({
 }) {
   const [text, setText] = useState(word?.text || initialText);
   const [chinese, setChinese] = useState(word?.chinese || "");
+  const [chineseSource, setChineseSource] = useState<Word["chineseSource"]>(
+    word?.chineseSource || (word?.chinese ? "manual" : undefined),
+  );
+  const chineseInput = useRef({
+    value: word?.chinese || "",
+    protected: !!word?.chinese,
+  });
+  const [candidateChinese, setCandidateChinese] = useState("");
+  const [chineseNote, setChineseNote] = useState(
+    word?.chinese
+      ? "已保存的中文释义会保留，不会被查词覆盖。"
+      : "自动查询本地英汉词典，结果可手动修改。",
+  );
   const [notes, setNotes] = useState(word?.notes || "");
   const [category, setCategory] = useState(word?.category || categories[0]);
   const [newCategory, setNewCategory] = useState("");
@@ -279,7 +379,7 @@ function Editor({
   const [queryNote, setQueryNote] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const lastQuery = useRef(word?.normalized || "");
+  const lastQuery = useRef(word?.chinese ? word.normalized : "");
   const controller = useRef<AbortController | null>(null);
   const query = useCallback(async (value: string) => {
     controller.current?.abort();
@@ -289,31 +389,69 @@ function Editor({
       return;
     }
     lastQuery.current = normalized;
-    if (!navigator.onLine) {
-      setLooking(false);
-      setQueryNote("当前离线，可以手动填写并保存，联网后再查询词典。");
-      return;
-    }
     const abort = new AbortController();
     controller.current = abort;
     setLooking(true);
     setQueryNote("");
     const timeout = setTimeout(() => abort.abort("timeout"), 8000);
+    let englishSucceeded = false;
+    let localAvailable = false;
+    const local = lookupLocalWord(normalized, abort.signal)
+      .then((entry) => {
+        if (abort.signal.aborted || controller.current !== abort) return;
+        if (!entry) {
+          setChineseNote("本地词典暂未收录，中文释义可手动填写。");
+          return;
+        }
+        localAvailable = true;
+        setCandidateChinese(entry.chinese);
+        if (!chineseInput.current.protected) {
+          chineseInput.current.value = entry.chinese;
+          setChinese(entry.chinese);
+          setChineseSource("ecdict");
+          setChineseNote("已自动填入中文释义（ECDICT），可以自由修改。");
+        } else
+          setChineseNote(
+            "已查到词典中文，保留你已有的解释；需要时可主动替换。",
+          );
+        if (!englishSucceeded) setData(entry.dictionary);
+      })
+      .catch((error) => {
+        if (!abort.signal.aborted && controller.current === abort)
+          setChineseNote(
+            error instanceof TypeError
+              ? "中文词典尚未下载完成，可以先手动填写。"
+              : message(error),
+          );
+      });
+    const english = navigator.onLine
+      ? lookupWord(normalized, abort.signal).then((result) => {
+          if (!abort.signal.aborted && controller.current === abort) {
+            englishSucceeded = true;
+            setData(result);
+          }
+        })
+      : Promise.resolve();
     try {
-      const result = await lookupWord(normalized, abort.signal);
-      if (!abort.signal.aborted) {
-        setData(result);
-        setQueryNote("已获取词典内容；中文释义请自行填写。");
-      }
-    } catch (e) {
-      if (!abort.signal.aborted)
+      const [, englishResult] = await Promise.allSettled([local, english]);
+      if (controller.current !== abort) return;
+      if (abort.signal.aborted) {
+        if (abort.signal.reason === "timeout")
+          setQueryNote("在线词典查询超时，已查到的本地内容仍可保存。");
+      } else if (englishSucceeded) setQueryNote("英文词典查询完成。");
+      else if (localAvailable)
         setQueryNote(
-          e instanceof TypeError
-            ? "网络不可用，可以手动填写并保存。"
-            : message(e),
+          navigator.onLine
+            ? "在线词典暂不可用，已显示 ECDICT 本地内容；可稍后重新查词补充音频和例句。"
+            : "离线查询完成；联网后可补充英美发音和例句。",
         );
-      else if (abort.signal.reason === "timeout")
-        setQueryNote("词典查询超时，可以手动保存，稍后重试。");
+      else if (englishResult.status === "rejected")
+        setQueryNote(
+          englishResult.reason instanceof TypeError
+            ? "网络不可用，可以手动填写并保存。"
+            : message(englishResult.reason),
+        );
+      else setQueryNote("当前离线，可以手动填写并保存，联网后再查询词典。");
     } finally {
       clearTimeout(timeout);
       if (controller.current === abort) setLooking(false);
@@ -348,11 +486,12 @@ function Editor({
             ...data,
             text,
             chinese,
+            chineseSource,
             notes,
             category,
             updatedAt: new Date().toISOString(),
           }
-        : makeWord(text, { ...data, chinese, notes, category });
+        : makeWord(text, { ...data, chinese, chineseSource, notes, category });
       await saveWord(value);
       await onSaved();
       onClose();
@@ -389,6 +528,13 @@ function Editor({
               setLooking(false);
               setText(e.target.value);
               setData(emptyDictionary());
+              setCandidateChinese("");
+              if (!chineseInput.current.protected) {
+                chineseInput.current.value = "";
+                setChinese("");
+                setChineseSource(undefined);
+              }
+              setChineseNote("自动查询本地英汉词典，手动解释不会被覆盖。");
               setQueryNote("");
               lastQuery.current = "";
             }}
@@ -410,7 +556,7 @@ function Editor({
         <div className="query-status" aria-live="polite">
           {looking ? (
             <>
-              <span>正在自动查询英文词典…</span>
+              <span>正在查询英文词典和中文释义…</span>
               <button
                 type="button"
                 className="text-button"
@@ -424,27 +570,54 @@ function Editor({
               </button>
             </>
           ) : (
-            queryNote || "自动查询英文音标、解释和音频，支持手动保存。"
+            queryNote || "自动查询音标、中文释义、英文解释和发音。"
           )}
         </div>
-        {data.phonetic && <p className="phonetic">{data.phonetic}</p>}
-        {(data.meanings.length > 0 || data.pronunciations.length > 0) && (
-          <details className="dictionary-preview">
-            <summary>查看词典结果 · {data.meanings.length} 条释义</summary>
-            <AudioButtons data={data} />
+        {(data.phonetic ||
+          data.meanings.length > 0 ||
+          data.pronunciations.length > 0) && (
+          <section className="dictionary-preview" aria-label="英文词典查询结果">
+            <h3>音标、英文释义与例句</h3>
+            <AudioButtons data={data} word={text} />
             <Definitions data={data} />
-          </details>
+          </section>
         )}
         <label htmlFor="word-chinese">
-          中文释义 <span className="muted">手动填写</span>
+          中文释义 <span className="muted">自动查询 · 可修改</span>
         </label>
-        <input
+        <textarea
           id="word-chinese"
-          placeholder="用自己的话解释，更容易记住"
+          rows={3}
+          placeholder="自动填入词典中文，也可以用自己的话修改"
           maxLength={10000}
           value={chinese}
-          onChange={(e) => setChinese(e.target.value)}
+          onChange={(e) => {
+            chineseInput.current = { value: e.target.value, protected: true };
+            setChinese(e.target.value);
+            setChineseSource("manual");
+            setChineseNote("已手动修改；查词不会覆盖你的解释。");
+          }}
         />
+        <p className="small muted" role="status">
+          {chineseNote}
+        </p>
+        {candidateChinese && candidateChinese !== chinese && (
+          <button
+            type="button"
+            className="text-button chinese-replace"
+            onClick={() => {
+              chineseInput.current = {
+                value: candidateChinese,
+                protected: false,
+              };
+              setChinese(candidateChinese);
+              setChineseSource("ecdict");
+              setChineseNote("已使用 ECDICT 词典中文，可继续手动修改。");
+            }}
+          >
+            用词典中文替换当前解释
+          </button>
+        )}
         <label htmlFor="word-category">单词分类</label>
         <div className="input-action">
           <select
@@ -567,8 +740,7 @@ function WordDetail({
       <div className="detail-top">
         <span className="eyebrow">{word.category}</span>
         <h2 lang="en">{word.text}</h2>
-        <p className="phonetic">{word.phonetic || "暂无音标"}</p>
-        <AudioButtons data={word} />
+        <AudioButtons data={word} word={word.text} />
       </div>
       <div className="detail-actions">
         <button
@@ -597,6 +769,13 @@ function WordDetail({
         <p className="chinese">
           {word.chinese || "尚未填写，点击编辑添加中文释义。"}
         </p>
+        {word.chinese && (
+          <p className="small muted">
+            {word.chineseSource === "ecdict"
+              ? "中文来源：ECDICT 本地词典（可编辑）"
+              : "中文解释：个人手动填写或修改"}
+          </p>
+        )}
       </section>
       {word.notes && (
         <section className="note-block">
@@ -849,7 +1028,7 @@ function BackupPanel({
           <li>首次联网打开，看到“离线已就绪”后即可离线使用。</li>
         </ol>
         <p>
-          离线可查看、添加、编辑和复习单词。词典查询需要网络，音频离线播放不作保证。中文释义始终由你自己填写。
+          离线可查看、添加、编辑和复习单词。缓存完成后，本地词典可自动提供收录词的中文释义，支持手动修改。在线词典查询和音频通常需要网络；缺少的音标、例句不会虚构。
         </p>
         <p>
           更新 App 不会主动清除 IndexedDB；但 iOS
@@ -998,8 +1177,7 @@ function ReviewPage({
           <article className="review-card" key={current.id}>
             <span className="eyebrow">{current.category}</span>
             <h2 lang="en">{current.text}</h2>
-            <p className="phonetic">{current.phonetic}</p>
-            <AudioButtons data={current} />
+            <AudioButtons data={current} word={current.text} />
             {!revealed ? (
               <button
                 className="reveal-button"

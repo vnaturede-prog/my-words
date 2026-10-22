@@ -97,6 +97,34 @@ describe("真实 IndexedDB API 持久化与事务（fake-indexeddb）", () => {
 });
 
 describe("备份校验与 CSV 安全", () => {
+  it("新旧 v1 备份兼容：中文来源与本地英文来源可以完整备份恢复", async () => {
+    await saveWord(
+      makeWord("ceramic", {
+        chinese: "陶瓷",
+        chineseSource: "ecdict",
+        dictionarySource: "ecdict",
+        notes: "我自己的中文备注",
+      }),
+    );
+    const backup = await createBackup();
+    const restored = parseBackup(JSON.stringify(backup));
+    expect(restored.words[0]).toMatchObject({
+      chineseSource: "ecdict",
+      dictionarySource: "ecdict",
+      notes: "我自己的中文备注",
+    });
+    delete backup.words[0].chineseSource;
+    delete backup.words[0].dictionarySource;
+    expect(parseBackup(JSON.stringify(backup)).words[0].chinese).toBe("陶瓷");
+    expect(() =>
+      parseBackup(
+        JSON.stringify({
+          ...backup,
+          words: [{ ...backup.words[0], chineseSource: "untrusted" }],
+        }),
+      ),
+    ).toThrow();
+  });
   it("拒绝损坏、错误版本、重复单词、孤立复习记录，不修改数据库", async () => {
     await saveWord(makeWord("safe", { chinese: "安全" }));
     const backup = await createBackup();
