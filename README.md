@@ -1,6 +1,6 @@
 # My Words 我的随身单词本
 
-一个适合 iPhone Safari 的中文英语单词本。无需登录、云数据库、付费 API 或苹果开发者账号，部署为普通 HTTPS 网站后即可添加到主屏幕。
+一个适合 iPhone Safari 的中文英语单词本。无需登录、云数据库、付费 API 或苹果开发者账号，通过 GitHub Pages 免费托管，部署后即可添加到主屏幕。
 
 ## 已实现的功能
 
@@ -16,7 +16,7 @@
 
 ## 在 iPhone 上使用
 
-1. 部署完成后，用 **Safari** 打开你的正式 `https://…vercel.app` 网址。
+1. GitHub Pages 部署成功后，用 **Safari** 打开 **https://vnaturede-prog.github.io/my-words/**。首次部署完成前，该地址可能显示 404。
 2. 联网等待页面右上角显示“离线已就绪”。
 3. 点 Safari 的**分享**按钮 → **添加到主屏幕** → **添加**。
 4. 点击 My Words 图标即可使用，不需要从 App Store 下载。
@@ -49,14 +49,36 @@ CSV 用来在 Excel/Numbers 中查看和打印，**不能代替可恢复的 JSON
 - 开发服务器不启用离线缓存，离线与安装功能请使用正式部署或本地生产预览验证。
 - 尚未在实体 iPhone 上验收；自动化移动浏览器测试不能完全代替设备上的安装、iOS 音频策略和系统存储回收测试。
 
-## 合并 Pull Request
+## 更新与合并 Pull Request
 
-1. 打开仓库的 **Pull requests**，进入 `feature/my-words-pwa` 面向 `main` 的 PR。
+1. 打开仓库的 **Pull requests**，进入对应功能分支面向 `main` 的 PR。
 2. 查看 **Files changed** 和 **Checks**。CI 会运行单元测试、生产构建，以及 Chromium/WebKit 的 iPhone 尺寸浏览器测试。
 3. 检查通过后，点击 **Merge pull request**（或 **Squash and merge**）→ **Confirm merge**。
-4. 如果你看到的只是开发分支，尚无 PR，可在仓库的 **Compare & pull request** 中选择 base `main`、compare `feature/my-words-pwa` 创建 PR；这一步不需要输入代码。
+4. 合并到 `main` 后，**Deploy GitHub Pages** 工作流会自动运行；等待部署成功后，正式网址就会更新。
 
-## 免费部署到 Vercel
+## 免费部署到 GitHub Pages（推荐）
+
+不需要 Vercel 账号或短信验证。免费个人方案通常要求仓库为 **Public**；公开后其他人能查看应用源码和提交历史，但你的浏览器单词、备注、JSON 下载文件不会因此上传。
+
+### 首次开启
+
+1. 进入 [仓库 Settings](https://github.com/vnaturede-prog/my-words/settings)。如果仓库是 Private，在页面最下方 **Danger Zone → Change repository visibility** 中改为 **Public**。此操作会公开仓库内容，必须由仓库所有者授权。
+2. 打开 [Settings → Pages](https://github.com/vnaturede-prog/my-words/settings/pages)。
+3. 在 **Build and deployment → Source** 选择 **GitHub Actions**。不需要选择 `gh-pages` 分支。
+4. 打开 [Actions](https://github.com/vnaturede-prog/my-words/actions)，选择 **Deploy GitHub Pages**。首次可点 **Run workflow → main → Run workflow**，以后每次合并到 `main` 都会自动部署。
+5. 等待 `build` 和 `deploy` 都变为绿色，再打开 **https://vnaturede-prog.github.io/my-words/**。
+
+工作流会安装锁定依赖、运行单元测试、生产构建和 Chromium/WebKit 的浏览器测试，全部通过后上传 `dist` 并发布。代码验证还会分别测试根路径 `/` 和 GitHub Pages 的 `/my-words/` 路径。
+
+如果当前 GitHub 授权提示 `Resource not accessible by integration (403)`，这是仓库设置权限不足；推送代码的权限并不等同于修改可见性或 Pages 的权限。仓库所有者仍可在上面的网页完成设置，不必把访问令牌发给别人。
+
+### 路径与 PWA
+
+GitHub 仓库网站位于 `/my-words/` 子路径。部署工作流设置 `VITE_BASE_PATH=/my-words/`，Vite 静态资源、图标、manifest 的 `id/start_url/scope`、Service Worker 注册与离线入口都使用相同路径。正式打开时保留网址末尾的 `/`。
+
+切换到 GitHub Pages 是切换网站域名；如果曾在其他域名使用 App，请先导出 JSON，再在 Pages 网址导入。浏览器不会自动跨域迁移数据。
+
+## Vercel 部署（可选）
 
 1. 进入 [Vercel](https://vercel.com/)，使用 GitHub 登录，选择 Hobby 免费方案（个人使用）。
 2. 点击 **Add New… → Project**，导入 `vnaturede-prog/my-words`。如果找不到仓库，给 Vercel 授予访问此仓库的权限。
@@ -86,6 +108,15 @@ npm run preview
 
 生产预览默认端口 4173。访问终端显示的本地地址。PWA 在 HTTPS 或 localhost 安全上下文中工作；iPhone 通过普通局域网 HTTP 地址打开不能完整验证 Service Worker。
 
+验证 GitHub Pages 子路径时，构建和预览必须使用相同环境变量：
+
+```bash
+VITE_BASE_PATH=/my-words/ npm run build
+VITE_BASE_PATH=/my-words/ npm run preview
+```
+
+此时在本地预览网址后加 `/my-words/`。默认不设置 `VITE_BASE_PATH` 时使用 `/`，保留 Vercel 等根路径部署兼容性。
+
 ```bash
 npm test
 npm run typecheck
@@ -96,6 +127,8 @@ npm run test:e2e
 ```
 
 浏览器测试会自动启动生产预览，覆盖新增、重复拦截、编辑、删除、收藏、复习、关闭页面后持久化、搜索、JSON/CSV 导出、无效文件拒绝、导入去重、manifest/图标检查，以及断网后的新页面启动和编辑。词典测试使用明确的模拟响应和网络失败，不把模拟结果当作真实网络可用性的证据。
+
+使用 `VITE_BASE_PATH=/my-words/ npm run test:e2e` 可针对已构建的 Pages 版本运行同一组浏览器测试，包括实际 Service Worker scope 与 manifest 路径断言。执行前请停止其他占用 4173 端口的预览服务。
 
 如云环境已有 Chromium，可使用现有浏览器运行 Chromium 项目：
 
@@ -118,7 +151,8 @@ public/              SVG 源图标、PNG 图标与 Apple Touch 图标
 tests/               数据库/词典单元测试和移动浏览器测试
 vite.config.ts       构建、manifest 和 Service Worker 配置
 vercel.json          Vercel 构建与缓存响应头配置
-.github/workflows/   GitHub Actions 持续验证
+.github/workflows/ci.yml     根路径与 Pages 子路径的持续验证
+.github/workflows/pages.yml  main 分支 GitHub Pages 自动部署
 ```
 
 ## 隐私与词典来源

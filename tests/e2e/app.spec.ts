@@ -52,7 +52,7 @@ test.describe("模拟词典的交互测试", () => {
     context,
   }) => {
     await mockDictionary(page);
-    await page.goto("/");
+    await page.goto("./");
     await expect(
       page.getByRole("button", { name: "添加第一个单词" }),
     ).toBeEnabled();
@@ -80,7 +80,7 @@ test.describe("模拟词典的交互测试", () => {
     await mockDictionary(reopened);
     await page.close();
     page = reopened;
-    await page.goto("/");
+    await page.goto("./");
     await expect(page.getByText("你好；喂", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "查看 hello" }).click();
     await expect(page.getByRole("button", { name: /美式/ })).toBeVisible();
@@ -197,7 +197,7 @@ test("PWA manifest、图标、Service Worker 与离线冷启动后新增编辑",
   page,
   context,
 }) => {
-  await page.goto("/");
+  await page.goto("./");
   await expect(page.getByText("离线已就绪")).toBeVisible({ timeout: 20000 });
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
@@ -207,16 +207,24 @@ test("PWA manifest、图标、Service Worker 与离线冷启动后新增编辑",
     true,
   );
   const manifest = await (
-    await page.request.get("/manifest.webmanifest")
+    await page.request.get("manifest.webmanifest")
   ).json();
   expect(manifest.display).toBe("standalone");
-  expect(manifest.start_url).toBe("/");
+  expect(manifest.start_url).toBe(process.env.VITE_BASE_PATH || "/");
+  expect(manifest.scope).toBe(process.env.VITE_BASE_PATH || "/");
+  expect(manifest.id).toBe(process.env.VITE_BASE_PATH || "/");
+  const registrationScope = await page.evaluate(
+    async () => (await navigator.serviceWorker.ready).scope,
+  );
+  expect(new URL(registrationScope).pathname).toBe(
+    process.env.VITE_BASE_PATH || "/",
+  );
   for (const icon of manifest.icons) {
     const response = await page.request.get(icon.src);
     expect(response.status()).toBe(200);
     expect((await response.body()).subarray(1, 4).toString()).toBe("PNG");
   }
-  expect((await page.request.get("/sw.js")).status()).toBe(200);
+  expect((await page.request.get("sw.js")).status()).toBe(200);
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByText("离线模式")).toBeVisible();
@@ -244,7 +252,7 @@ test("PWA manifest、图标、Service Worker 与离线冷启动后新增编辑",
   await expect(page.getByText("没有网络也能修改")).toBeVisible();
   // A separate page starts from the cached app shell with no network.
   const cold = await context.newPage();
-  await cold.goto("/");
+  await cold.goto("./");
   await expect(
     cold.getByRole("button", { name: "查看 offline" }),
   ).toBeVisible();
@@ -256,7 +264,7 @@ test.describe("网络故障交互测试", () => {
     await page.route("https://api.dictionaryapi.dev/api/**", (route) =>
       route.abort("failed"),
     );
-    await page.goto("/");
+    await page.goto("./");
     await page.getByRole("button", { name: "添加第一个单词" }).click();
     await page
       .getByRole("dialog")
