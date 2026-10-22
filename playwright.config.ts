@@ -1,10 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
+const baseURL = `http://127.0.0.1:4173${process.env.VITE_BASE_PATH || "/"}`;
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
   retries: 0,
+  reporter: process.env.CI ? [["list"], ["github"]] : "list",
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL,
     trace: "retain-on-failure",
     acceptDownloads: true,
   },
@@ -31,7 +33,7 @@ export default defineConfig({
   ],
   webServer: {
     command: "npm run preview -- --port 4173 --strictPort",
-    url: "http://127.0.0.1:4173",
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
   },
 });

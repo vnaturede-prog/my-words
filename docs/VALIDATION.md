@@ -21,3 +21,13 @@
 云机器缺少 WebKit 的部分系统库且没有管理员密码。本次从 Debian 官方签名软件源下载对应运行库，解包到仓库外的隔离缓存目录，并使用单独启动器运行未修改的官方 Playwright WebKit；没有关闭包签名、校验和或 TLS 验证。GitHub Actions 使用标准 `playwright install --with-deps` 流程。
 
 尚需实际设备/部署验收：iPhone Safari 的“添加到主屏幕”、主屏幕独立启动、真机音频播放，以及 Vercel 正式域名访问。中文 README 已提供合并 PR、免费部署及备份步骤。
+
+## GitHub Pages 路径适配验证
+
+已验证两种构建：默认 `/` 和 `VITE_BASE_PATH=/my-words/`。两次生产构建均成功，单元测试 8/8 通过；每种路径的 Chromium/WebKit 浏览器测试各 6/6 通过，合计 12 项浏览器测试通过。
+
+新增断言验证 manifest 的 `id`、`start_url`、`scope`，以及实际安装的 Service Worker scope 均等于当前部署路径。两种构建都验证了断网后刷新、新页面冷启动、离线新增和编辑，图标也从对应路径正常读取。
+
+`.github/workflows/pages.yml` 已配置：`main` 推送或手动触发后，先运行单元测试、Pages 构建和 6 项浏览器测试，再通过官方 Pages artifact / deploy actions 发布 `dist`。
+
+部署权限与构建验证是两回事：本次 GitHub 集成对修改仓库可见性、读取 Pages 设置返回 `Resource not accessible by integration (403)`。因此仓库所有者需要在网页上将仓库设为 Public（免费方案），并在 Settings → Pages 中将 Source 选为 GitHub Actions。只有 Pages 部署任务成功且正式 HTTPS 网址验证后，才能认定已上线；上述本地测试结果本身不代表已发布。
