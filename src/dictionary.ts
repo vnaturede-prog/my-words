@@ -20,6 +20,7 @@ export async function lookupWord(
   if (!Array.isArray(payload) || !payload.length)
     throw new Error("词典没有返回可用内容，可以手动保存。");
   const result = emptyDictionary();
+  result.dictionarySource = "free-dictionary";
   for (const entry of payload) {
     if (!entry || typeof entry !== "object") continue;
     if (!result.phonetic && typeof entry.phonetic === "string")

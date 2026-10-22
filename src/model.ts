@@ -16,6 +16,7 @@ export interface Pronunciation {
   accent: "US" | "UK" | "其他";
 }
 export interface DictionaryData {
+  dictionarySource?: "free-dictionary" | "ecdict";
   phonetic: string;
   pronunciations: Pronunciation[];
   meanings: Meaning[];
@@ -28,6 +29,7 @@ export interface Word extends DictionaryData {
   text: string;
   normalized: string;
   chinese: string;
+  chineseSource?: "ecdict" | "manual";
   notes: string;
   category: string;
   favorite: boolean;

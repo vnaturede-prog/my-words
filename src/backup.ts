@@ -39,6 +39,13 @@ function list(value: unknown, max = 100000): unknown[] {
 function bool(value: unknown) {
   return typeof value === "boolean" ? value : fail();
 }
+function optionalSource<T extends string>(
+  value: unknown,
+  allowed: T[],
+): T | undefined {
+  if (value === undefined) return undefined;
+  return allowed.includes(value as T) ? (value as T) : fail();
+}
 export function parseBackup(text: string): Backup {
   if (new Blob([text]).size > 10 * 1024 * 1024)
     throw new Error("文件超过 10 MB，请拆分备份后导入。");
@@ -85,6 +92,11 @@ export function parseBackup(text: string): Backup {
       text: normalized,
       normalized,
       chinese: str(w.chinese),
+      chineseSource: optionalSource(w.chineseSource, ["ecdict", "manual"]),
+      dictionarySource: optionalSource(w.dictionarySource, [
+        "ecdict",
+        "free-dictionary",
+      ]),
       notes: str(w.notes),
       category: nonempty(w.category, 40),
       favorite: bool(w.favorite),
