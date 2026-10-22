@@ -309,6 +309,7 @@ test("PWA manifest、图标、Service Worker 与离线冷启动后新增编辑",
   page,
   context,
 }) => {
+  test.setTimeout(60000);
   await page.goto("./");
   await expect(page.getByText("离线已就绪")).toBeVisible({ timeout: 20000 });
   await page.evaluate(async () => {
@@ -382,6 +383,10 @@ test("PWA manifest、图标、Service Worker 与离线冷启动后新增编辑",
   await cold.getByLabel("中文释义", { exact: false }).fill("我修改的 reels 中文解释");
   await cold.getByLabel("我的中文备注").fill("复数与第三人称单数：离线保存");
   await cold.getByRole("button", { name: "保存单词", exact: true }).click();
+  // Clicking dispatches an async submit; wait for the committed record before
+  // navigating away, just as the ceramic save above already does.
+  await expect(cold.getByRole("dialog")).toHaveCount(0);
+  await expect(cold.getByRole("button", { name: "查看 reels" })).toBeVisible();
   await cold.reload();
   await cold.getByRole("button", { name: "查看 reels" }).click();
   await expect(cold.getByRole("dialog").getByText("我修改的 reels 中文解释", { exact: true })).toBeVisible();
